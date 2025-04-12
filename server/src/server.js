@@ -7,6 +7,7 @@ const routes = require('./routes/index');
 
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const path = require('path');
 
 app.use(cors({ origin: '*' }));
 app.use(bodyParser.json());
@@ -15,6 +16,8 @@ app.use(express.json());
 
 connectDB();
 routes(app);
+
+app.use(express.static(path.join(__dirname, '../src')));
 
 app.use((err, req, res, next) => {
     const statusCode = err.statusCode || 500;
