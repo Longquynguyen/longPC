@@ -10,12 +10,17 @@ import {
     MenuUnfoldOutlined,
     FileOutlined,
 } from '@ant-design/icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import ManagerProduct from './Components/ManagerProducts/ManagerProduct';
 import DashBoard from './Components/DashBoard/DashBoard';
 import ManagerCategory from './Components/ManagerCategory/ManagerCategory';
-
+import ManagerOrder from './Components/ManagerOrder/ManagerOrder';
+import ManagerUser from './Components/ManagerUser/ManagerUser';
+import { requestAdmin } from '../../config/request';
+import { useNavigate } from 'react-router-dom';
+import ManagerBlogs from './Components/ManagerBlogs/ManagerBlogs';
+import ManagerContact from './Components/ManagerContact/ManagerContact';
 const { Header, Sider, Content } = Layout;
 const cx = classNames.bind(styles);
 
@@ -23,6 +28,19 @@ function Admin() {
     const [collapsed, setCollapsed] = useState(false);
     const { token } = theme.useToken();
     const [selectedKey, setSelectedKey] = useState('home');
+
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const checkAdmin = async () => {
+            try {
+                await requestAdmin();
+            } catch (error) {
+                navigate('/');
+            }
+        };
+        checkAdmin();
+    }, []);
 
     const menuItems = [
         {
@@ -39,6 +57,26 @@ function Admin() {
             key: 'category',
             icon: <FileOutlined />,
             label: 'Quản lý danh mục',
+        },
+        {
+            key: 'order',
+            icon: <ShoppingOutlined />,
+            label: 'Quản lý đơn hàng',
+        },
+        {
+            key: 'users',
+            icon: <UserOutlined />,
+            label: 'Quản lý người dùng',
+        },
+        {
+            key: 'blogs',
+            icon: <FileOutlined />,
+            label: 'Quản lý bài viết',
+        },
+        {
+            key: 'contact',
+            icon: <FileOutlined />,
+            label: 'Quản lý liên hệ',
         },
     ];
 
@@ -64,6 +102,14 @@ function Admin() {
                 return <DashBoard />;
             case 'category':
                 return <ManagerCategory />;
+            case 'order':
+                return <ManagerOrder />;
+            case 'users':
+                return <ManagerUser />;
+            case 'blogs':
+                return <ManagerBlogs />;
+            case 'contact':
+                return <ManagerContact />;
             default:
                 return <DashBoard />;
         }

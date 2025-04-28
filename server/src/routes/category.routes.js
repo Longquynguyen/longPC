@@ -10,5 +10,7 @@ router.post('/api/create-category', asyncHandler(controllerCategory.createCatego
 router.get('/api/get-all-category', asyncHandler(controllerCategory.getAllCategory));
 router.delete('/api/delete-category', asyncHandler(controllerCategory.deleteCategory));
 router.post('/api/update-category', asyncHandler(controllerCategory.updateCategory));
+router.get('/api/get-category-by-component-types', asyncHandler(controllerCategory.getCategoryByComponentTypes));
+router.get('/api/get-all-products', asyncHandler(controllerCategory.getAllProductsWithFilters));
 
 module.exports = router;

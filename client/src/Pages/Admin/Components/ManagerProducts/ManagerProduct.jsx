@@ -1,13 +1,20 @@
 import { Table, Button, Space, Modal, Form, Input, InputNumber, Upload, Select, message } from 'antd';
 
-import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 
 import { Editor } from '@tinymce/tinymce-react';
 
 import styles from './ManagerProduct.module.scss';
 import classNames from 'classnames/bind';
-import { requestGetCategory } from '../../../../config/request';
+import {
+    requestCreateProduct,
+    requestGetCategory,
+    requestGetProducts,
+    requestUploadImages,
+    requestUpdateProduct,
+    requestDeleteProduct,
+} from '../../../../config/request';
 
 const cx = classNames.bind(styles);
 
@@ -16,6 +23,8 @@ function ManagerProduct() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [fileList, setFileList] = useState([]);
+    const [editorContent, setEditorContent] = useState('');
+    const [productType, setProductType] = useState('pc');
 
     const [categories, setCategories] = useState([]);
 
@@ -28,26 +37,14 @@ function ManagerProduct() {
     }, []);
 
     // Fake data for demonstration
-    const [products] = useState([
-        {
-            id: '1',
-            name: 'PC Gaming Pro',
-            price: 1500,
-            description: 'High-end gaming PC',
-            discount: 10,
-            images: ['image1.jpg', 'image2.jpg'],
-            category: 'Gaming',
-            stock: 10,
-            cpu: 'Intel i9',
-            main: 'Z690',
-            ram: '32GB DDR5',
-            storage: '2TB NVMe',
-            gpu: 'RTX 4080',
-            power: '850W',
-            case: 'NZXT H510',
-            coolers: 'NZXT Kraken',
-        },
-    ]);
+    const [products, setProducts] = useState([]);
+    const fetchProducts = async () => {
+        const products = await requestGetProducts();
+        setProducts(products.metadata);
+    };
+    useEffect(() => {
+        fetchProducts();
+    }, []);
 
     const handleAdd = () => {
         setEditingProduct(null);
@@ -57,17 +54,43 @@ function ManagerProduct() {
     };
 
     const handleEdit = (record) => {
+        console.log('Editing record:', record); // Debug log
         setEditingProduct(record);
-        form.setFieldsValue(record);
-        setFileList(
-            record.images.map((img, index) => ({
-                uid: `-${index}`,
-                name: img,
-                status: 'done',
-                url: img,
-            })),
-        );
-        setIsModalOpen(true);
+
+        // Ensure all form fields are set correctly
+        form.setFieldsValue({
+            name: record.name,
+            price: record.price,
+            discount: record.discount || 0,
+            stock: record.stock,
+            category: record.category,
+            description: record.description,
+            cpu: record.cpu,
+            main: record.main,
+            ram: record.ram,
+            storage: record.storage,
+            gpu: record.gpu,
+            power: record.power,
+            caseComputer: record.caseComputer,
+            coolers: record.coolers,
+        });
+
+        // Set images
+        if (record.images) {
+            const imageList = Array.isArray(record.images) ? record.images : record.images.split(',');
+
+            setFileList(
+                imageList.map((img, index) => ({
+                    uid: `-${index}`,
+                    name: `image-${index}`,
+                    status: 'done',
+                    url: img,
+                })),
+            );
+        }
+
+        setEditorContent(record.description || '');
+        setIsModalOpen(true); // Make sure this is being called
     };
 
     const handleDelete = (record) => {
@@ -77,25 +100,78 @@ function ManagerProduct() {
             okText: 'Xóa',
             okType: 'danger',
             cancelText: 'Hủy',
-            onOk() {
+            onOk: async () => {
+                await requestDeleteProduct(record.id);
+                await fetchProducts();
                 message.success('Đã xóa sản phẩm');
             },
         });
     };
 
-    const handleModalOk = () => {
+    const handleModalOk = async () => {
         form.validateFields()
-            .then((values) => {
-                console.log('Success:', values);
+            .then(async (values) => {
+                let imageUrls = [];
+
+                // Handle image uploads only if there are new images
+                const newImages = fileList.filter((file) => file.originFileObj);
+                if (newImages.length > 0) {
+                    const formData = new FormData();
+                    newImages.forEach((file) => {
+                        formData.append('images', file.originFileObj);
+                    });
+                    const resImages = await requestUploadImages(formData);
+
+                    // Combine new uploaded images with existing images
+                    const existingImages = fileList.filter((file) => !file.originFileObj).map((file) => file.url);
+                    imageUrls = [...existingImages, ...resImages.images];
+                } else {
+                    // Keep existing images if no new uploads
+                    imageUrls = fileList.map((file) => file.url);
+                }
+
+                const data = {
+                    ...values,
+                    description: editorContent,
+                    images: imageUrls.join(','),
+                    componentType: productType,
+                };
+
+                if (editingProduct) {
+                    data.id = editingProduct.id;
+                    await requestUpdateProduct(data);
+                } else {
+                    await requestCreateProduct(data);
+                }
+
+                await fetchProducts();
                 message.success(`${editingProduct ? 'Cập nhật' : 'Thêm'} sản phẩm thành công`);
                 setIsModalOpen(false);
             })
             .catch((info) => {
                 console.log('Validate Failed:', info);
+                message.error(info.response.data.message);
             });
     };
 
+    // Add this useEffect to debug modal state
+    useEffect(() => {
+        console.log('Modal state:', isModalOpen);
+    }, [isModalOpen]);
+
     const columns = [
+        {
+            title: 'Ảnh sản phẩm',
+            dataIndex: 'images',
+            key: 'images',
+            render: (images) => (
+                <img
+                    src={images.split(',')[0]}
+                    alt="123"
+                    style={{ width: '100px', height: '100px', borderRadius: '10px' }}
+                />
+            ),
+        },
         {
             title: 'Tên sản phẩm',
             dataIndex: 'name',
@@ -107,11 +183,7 @@ function ManagerProduct() {
             key: 'price',
             render: (price) => `$${price.toLocaleString()}`,
         },
-        {
-            title: 'Danh mục',
-            dataIndex: 'category',
-            key: 'category',
-        },
+
         {
             title: 'Kho',
             dataIndex: 'stock',
@@ -141,8 +213,10 @@ function ManagerProduct() {
             setFileList(newFileList);
         },
         beforeUpload: (file) => {
-            setFileList([...fileList, file]);
-            return false;
+            return false; // Prevent auto upload
+        },
+        onChange: (info) => {
+            setFileList(info.fileList);
         },
         fileList,
         multiple: true,
@@ -167,6 +241,29 @@ function ManagerProduct() {
                 width={800}
             >
                 <Form form={form} layout="vertical" className={cx('form')}>
+                    <Form.Item
+                        name="componentType"
+                        label="Loại sản phẩm"
+                        rules={[{ required: true, message: 'Vui lòng chọn loại sản phẩm!' }]}
+                        initialValue="pc"
+                    >
+                        <Select onChange={(value) => setProductType(value)}>
+                            <Select.Option value="pc">PC</Select.Option>
+                            <Select.Option value="cpu">CPU</Select.Option>
+                            <Select.Option value="mainboard">Main</Select.Option>
+                            <Select.Option value="ram">RAM</Select.Option>
+                            <Select.Option value="hdd">Ổ cứng</Select.Option>
+                            <Select.Option value="gpu">GPU</Select.Option>
+                            <Select.Option value="power">Nguồn</Select.Option>
+                            <Select.Option value="case">Case</Select.Option>
+                            <Select.Option value="cooler">Cooler</Select.Option>
+                            <Select.Option value="monitor">Màn hình</Select.Option>
+                            <Select.Option value="keyboard">Bàn phím</Select.Option>
+                            <Select.Option value="mouse">Chuột</Select.Option>
+                            <Select.Option value="headset">Tai nghe</Select.Option>
+                        </Select>
+                    </Form.Item>
+
                     <div className={cx('form-row')}>
                         <Form.Item
                             name="name"
@@ -181,6 +278,20 @@ function ManagerProduct() {
                                 style={{ width: '100%' }}
                                 formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                                 parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="discount"
+                            label="Giảm giá (%)"
+                            rules={[{ required: true, message: 'Vui lòng nhập % giảm giá!' }]}
+                        >
+                            <InputNumber
+                                style={{ width: '100%' }}
+                                min={0}
+                                max={100}
+                                formatter={(value) => `${value}%`}
+                                parser={(value) => value.replace('%', '')}
                             />
                         </Form.Item>
                     </div>
@@ -221,13 +332,22 @@ function ManagerProduct() {
                                     'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat',
                             }}
                             initialValue="Welcome to TinyMCE!"
+                            onEditorChange={(content, editor) => {
+                                setEditorContent(content);
+                                form.setFieldsValue({ description: content });
+                            }}
                         />
                     </Form.Item>
 
                     <Form.Item
                         name="images"
                         label="Hình ảnh"
-                        rules={[{ required: true, message: 'Vui lòng tải lên ít nhất 1 hình ảnh!' }]}
+                        rules={[
+                            {
+                                required: !editingProduct,
+                                message: 'Vui lòng tải lên ít nhất 1 hình ảnh!',
+                            },
+                        ]}
                     >
                         <Upload {...uploadProps} listType="picture-card">
                             <div>
@@ -237,45 +357,45 @@ function ManagerProduct() {
                         </Upload>
                     </Form.Item>
 
-                    <div className={cx('form-row')}>
-                        <Form.Item name="cpu" label="CPU" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
+                    {productType === 'pc' && (
+                        <>
+                            <div className={cx('form-row')}>
+                                <Form.Item name="cpu" label="CPU" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="main" label="Mainboard" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                            </div>
 
-                        <Form.Item name="main" label="Mainboard" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-                    </div>
+                            <div className={cx('form-row')}>
+                                <Form.Item name="ram" label="RAM" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="storage" label="Ổ cứng" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                            </div>
 
-                    <div className={cx('form-row')}>
-                        <Form.Item name="ram" label="RAM" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
+                            <div className={cx('form-row')}>
+                                <Form.Item name="gpu" label="Card đồ họa" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="power" label="Nguồn" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                            </div>
 
-                        <Form.Item name="storage" label="Ổ cứng" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-                    </div>
-
-                    <div className={cx('form-row')}>
-                        <Form.Item name="gpu" label="Card đồ họa" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-
-                        <Form.Item name="power" label="Nguồn" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-                    </div>
-
-                    <div className={cx('form-row')}>
-                        <Form.Item name="case" label="Case" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-
-                        <Form.Item name="coolers" label="Tản nhiệt" rules={[{ required: true }]}>
-                            <Input />
-                        </Form.Item>
-                    </div>
+                            <div className={cx('form-row')}>
+                                <Form.Item name="caseComputer" label="Case" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="coolers" label="Tản nhiệt" rules={[{ required: true }]}>
+                                    <Input />
+                                </Form.Item>
+                            </div>
+                        </>
+                    )}
                 </Form>
             </Modal>
         </div>

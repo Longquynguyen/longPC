@@ -1,47 +1,48 @@
 const { DataTypes } = require('sequelize');
 const { connect } = require('../config/index');
 
-const User = connect.define('User', {
-    id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        primaryKey: true,
+const User = connect.define(
+    'users',
+    {
+        id: {
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
+            primaryKey: true,
+        },
+        fullName: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
+        phone: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        address: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        email: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
+        password: {
+            type: DataTypes.STRING,
+            allowNull: true,
+        },
+        isAdmin: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: '0',
+        },
+        typeLogin: {
+            type: DataTypes.ENUM('google', 'email'),
+            allowNull: false,
+        },
     },
-    fullName: {
-        type: DataTypes.STRING,
-        allowNull: false,
+    {
+        freezeTableName: true, // 👈 Giữ nguyên tên bảng là 'users'
+        timestamps: true,
     },
-    phone: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-    },
-    address: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    email: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-    },
-    password: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    isAdmin: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: '0',
-    },
-});
-
-User.sync({ force: true })
-    .then(() => {
-        console.log('User table has been created.');
-    })
-    .catch((err) => {
-        console.error('Unable to create table:', err);
-    });
+);
 
 module.exports = User;
